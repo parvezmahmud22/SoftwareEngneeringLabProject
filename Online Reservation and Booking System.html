@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Online Reservation and Booking System</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b2330;--mu:#667085;--bd:#e2e5ea;--ac:#2563eb;--act:#fff;--ok:#16a34a;--bad:#dc2626;--warn:#d97706;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1a2029;--tx:#e8ecf2;--mu:#98a2b3;--bd:#2c3440;--ac:#5b8def;--act:#0b1220;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1a2029;--tx:#e8ecf2;--mu:#98a2b3;--bd:#2c3440;--ac:#5b8def;--act:#0b1220;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--bd)}
+h1{font-size:18px;margin:0}h2{font-size:16px;margin:0 0 10px}
+main{max-width:980px;margin:0 auto;padding:16px}
+.tabs{display:flex;gap:6px}
+button,.btn{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:7px 13px;border-radius:8px;cursor:pointer}
+button.p{background:var(--ac);color:var(--act);border-color:var(--ac)}
+button.on{background:var(--ac);color:var(--act);border-color:var(--ac)}
+button.d{color:var(--bad)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--mu);gap:3px}
+input,select{font:inherit;padding:7px 9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);color:var(--mu)}
+.s-Confirmed{color:var(--ac)}.s-Checked-in{color:var(--warn)}.s-Checked-out{color:var(--ok)}.s-Cancelled{color:var(--bad)}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:640px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);font-size:14px}th{color:var(--mu);font-weight:600}
+.mu{color:var(--mu);font-size:13px}.tot{font-size:18px;font-weight:700}
+.msg{padding:10px 12px;border-radius:8px;margin-bottom:12px;border:1px solid var(--bd)}
+.msg.ok{color:var(--ok)}.msg.er{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.stats div{background:var(--bg);border-radius:10px;padding:10px}.stats b{display:block;font-size:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Online Reservation and Booking System</h1>
+  <div class="tabs"><button id="rc" onclick="setRole('customer')">Customer</button><button id="ra" onclick="setRole('admin')">Administrator</button></div>
+</header>
+<main id="app"></main>
+<script>
+var KEY="obs_v1",S,role="customer",msg=null,sel=null,filt={type:"All",from:"",to:""};
+var EXTRAS=[{id:"breakfast",n:"Breakfast",p:15},{id:"driver",n:"Driver / guide",p:40},{id:"decor",n:"Decoration",p:30}];
+var TYPES=["Resort","Vehicle","Conference Hall"];
+function seed(){return{services:[{id:1,type:"Resort",name:"Sea Pearl Resort Suite",rate:120,active:1},{id:2,type:"Resort",name:"Hill View Cottage",rate:85,active:1},{id:3,type:"Vehicle",name:"Toyota Noah (7 seats)",rate:60,active:1},{id:4,type:"Conference Hall",name:"Grand Hall (200 seats)",rate:300,active:1}],bookings:[],seq:1}}
+function load(){try{var d=localStorage.getItem(KEY);S=d?JSON.parse(d):seed()}catch(e){S=seed()}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function today(){return new Date().toISOString().slice(0,10)}
+function days(a,b){return Math.round((new Date(b)-new Date(a))/864e5)}
+function free(sid,a,b){return !S.bookings.some(function(k){return k.sid==sid&&k.status!="Cancelled"&&k.status!="Checked-out"&&a<k.to&&b>k.from})}
+function price(sv,a,b,ex){var n=days(a,b),t=0,d=new Date(a);for(var i=0;i<n;i++){var m=d.getMonth(),w=d.getDay(),r=sv.rate;if(m==11||m==0)r*=1.2;if(w==5||w==6)r*=1.1;t+=r;d.setDate(d.getDate()+1)}
+ var disc=n>=3?t*.1:0,xt=0;ex.forEach(function(id){xt+=EXTRAS.filter(function(e){return e.id==id})[0].p});return{n:n,base:t,disc:disc,extra:xt,total:t-disc+xt}}
+function m(x){return"$"+x.toFixed(2)}
+function setRole(r){role=r;sel=null;msg=null;render()}
+function flash(t,ok){msg={t:t,ok:ok}}
+function render(){document.getElementById("rc").className=role=="customer"?"on":"";document.getElementById("ra").className=role=="admin"?"on":"";
+ var h=msg?'<div class="msg '+(msg.ok?"ok":"er")+'">'+esc(msg.t)+'</div>':"";msg=null;
+ document.getElementById("app").innerHTML=h+(role=="admin"?admin():customer())}
+function customer(){
+ var h='<div class="card"><h2>Find a service</h2><div class="row"><label>Type<select onchange="filt.type=this.value;render()"><option>All</option>'+TYPES.map(function(t){return'<option'+(filt.type==t?" selected":"")+'>'+t+'</option>'}).join("")+'</select></label>'+
+ '<label>From<input type="date" min="'+today()+'" value="'+filt.from+'" onchange="filt.from=this.value;render()"></label><label>To<input type="date" min="'+(filt.from||today())+'" value="'+filt.to+'" onchange="filt.to=this.value;render()"></label></div>'+
+ '<p class="mu">Pick dates to see availability. Prices include a 20% peak-season rate (Dec–Jan), 10% weekend uplift and 10% discount for 3+ days.</p></div>';
+ var ok=filt.from&&filt.to&&filt.to>filt.from;
+ h+='<div class="grid">'+S.services.filter(function(s){return s.active&&(filt.type=="All"||s.type==filt.type)}).map(function(s){
+  var a=ok?free(s.id,filt.from,filt.to):null;
+  return'<div class="card"><span class="tag">'+esc(s.type)+'</span><h2 style="margin-top:8px">'+esc(s.name)+'</h2><div class="mu">'+m(s.rate)+' per day</div><p>'+(ok?(a?'<b style="color:var(--ok)">Available</b> · est. '+m(price(s,filt.from,filt.to,[]).total):'<b style="color:var(--bad)">Not available</b>'):'<span class="mu">Select dates</span>')+'</p><button class="p" '+(ok&&a?"":"disabled")+' onclick="sel='+s.id+';render()">Book</button></div>'}).join("")+'</div>';
+ if(sel)h+=form();
+ h+=mine();return h}
+function form(){var s=S.services.filter(function(x){return x.id==sel})[0];
+ return'<div class="card" id="bf"><h2>Book: '+esc(s.name)+'</h2><div class="row"><label>Full name<input id="cn"></label><label>Phone<input id="cp"></label><label>Email<input id="ce" type="email"></label></div><p class="mu" style="margin-bottom:4px">Customize your reservation</p><div class="row">'+EXTRAS.map(function(e){return'<label style="flex-direction:row;align-items:center;color:var(--tx)"><input type="checkbox" class="ex" value="'+e.id+'" onchange="upd()"> '+e.n+' (+'+m(e.p)+')</label>'}).join("")+'</div>'+
+ '<div class="row" style="margin-top:10px"><label>Payment method<select id="pm"><option>Card</option><option>bKash</option><option>Nagad</option></select></label><label>Card / account no.<input id="pn" placeholder="Demo only, not stored"></label></div><p id="pt" class="tot"></p><button class="p" onclick="book()">Pay and confirm</button> <button onclick="sel=null;render()">Cancel</button></div>'}
+function exs(){return[].slice.call(document.querySelectorAll(".ex:checked")).map(function(e){return e.value})}
+function upd(){var s=S.services.filter(function(x){return x.id==sel})[0],p=price(s,filt.from,filt.to,exs());document.getElementById("pt").innerHTML="Total: "+m(p.total)+' <span class="mu">('+p.n+' day(s) '+m(p.base)+(p.disc?", discount −"+m(p.disc):"")+(p.extra?", extras "+m(p.extra):"")+")</span>"}
+function book(){var n=document.getElementById("cn").value.trim(),ph=document.getElementById("cp").value.trim(),em=document.getElementById("ce").value.trim(),pn=document.getElementById("pn").value.trim();
+ if(!n||!ph||!/^\S+@\S+\.\S+$/.test(em)){flash("Please enter a valid name, phone and email.",0);return render()}
+ if(pn.length<4){flash("Payment failed: enter a payment number (demo). Booking not confirmed.",0);return render()}
+ if(!free(sel,filt.from,filt.to)){flash("Sorry, this slot was just booked.",0);sel=null;return render()}
+ var s=S.services.filter(function(x){return x.id==sel})[0],ex=exs(),p=price(s,filt.from,filt.to,ex);
+ var id="BK"+String(1000+S.seq++);S.bookings.push({id:id,sid:s.id,sname:s.name,cname:n,phone:ph,email:em,from:filt.from,to:filt.to,extras:ex,total:p.total,pay:document.getElementById("pm").value,status:"Confirmed"});save();sel=null;flash("Payment received. Booking "+id+" confirmed. Total "+m(p.total)+".",1);render()}
+function mine(){var b=S.bookings.slice().reverse();if(!b.length)return"";
+ return'<div class="card"><h2>My bookings</h2><div class="tw"><table><tr><th>ID</th><th>Service</th><th>Dates</th><th>Total</th><th>Status</th><th></th></tr>'+b.map(function(k){return'<tr><td>'+k.id+'</td><td>'+esc(k.sname)+'<div class="mu">'+esc(k.cname)+'</div></td><td>'+k.from+" → "+k.to+'</td><td>'+m(k.total)+'</td><td class="s-'+k.status+'">'+k.status+'</td><td>'+(k.status=="Confirmed"?'<button class="d" onclick="cancel(\''+k.id+'\')">Cancel</button>':"")+'</td></tr>'}).join("")+'</table></div></div>'}
+function cancel(id){var k=S.bookings.filter(function(x){return x.id==id})[0];if(k&&k.status=="Confirmed"){k.status="Cancelled";save();flash("Booking "+id+" cancelled. Slot is free again.",1)}render()}
+function admin(){
+ var rev=0,act=0;S.bookings.forEach(function(k){if(k.status!="Cancelled")rev+=k.total;if(k.status=="Confirmed"||k.status=="Checked-in")act++});
+ var h='<div class="card"><h2>Dashboard</h2><div class="stats"><div><b>'+S.services.length+'</b>Services</div><div><b>'+S.bookings.length+'</b>Bookings</div><div><b>'+act+'</b>Active</div><div><b>'+m(rev)+'</b>Revenue</div></div></div>';
+ h+='<div class="card"><h2>Add / update service</h2><div class="row"><label>Type<select id="at">'+TYPES.map(function(t){return"<option>"+t+"</option>"}).join("")+'</select></label><label>Name<input id="an"></label><label>Rate per day ($)<input id="ar" type="number" min="1"></label><button class="p" onclick="addS()">Save service</button></div></div>';
+ h+='<div class="card"><h2>Services</h2><div class="tw"><table><tr><th>Type</th><th>Name</th><th>Rate/day</th><th></th></tr>'+S.services.map(function(s){return'<tr><td>'+esc(s.type)+'</td><td>'+esc(s.name)+'</td><td><input type="number" min="1" value="'+s.rate+'" style="width:90px" onchange="setRate('+s.id+',this.value)"></td><td><button class="d" onclick="delS('+s.id+')">Delete</button></td></tr>'}).join("")+'</table></div></div>';
+ h+='<div class="card"><h2>Bookings and customers</h2>'+(S.bookings.length?'<div class="tw"><table><tr><th>ID</th><th>Customer</th><th>Service</th><th>Dates</th><th>Paid via</th><th>Status</th><th>Action</th></tr>'+S.bookings.slice().reverse().map(function(k){return'<tr><td>'+k.id+'</td><td>'+esc(k.cname)+'<div class="mu">'+esc(k.phone)+" · "+esc(k.email)+'</div></td><td>'+esc(k.sname)+'</td><td>'+k.from+" → "+k.to+'</td><td>'+k.pay+" "+m(k.total)+'</td><td class="s-'+k.status+'">'+k.status+'</td><td>'+(k.status=="Confirmed"?'<button class="p" onclick="step(\''+k.id+'\',\'Checked-in\')">Check in</button>':k.status=="Checked-in"?'<button class="p" onclick="step(\''+k.id+'\',\'Checked-out\')">Check out</button>':"")+'</td></tr>'}).join("")+'</table></div>':'<p class="mu">No bookings yet. Make one from the Customer tab.</p>')+'</div>';
+ return h}
+function addS(){var n=document.getElementById("an").value.trim(),r=+document.getElementById("ar").value;if(!n||!(r>0)){flash("Enter a service name and a rate above 0.",0);return render()}
+ S.services.push({id:Date.now(),type:document.getElementById("at").value,name:n,rate:r,active:1});save();flash("Service added.",1);render()}
+function setRate(id,v){var s=S.services.filter(function(x){return x.id==id})[0];if(s&&+v>0){s.rate=+v;save();flash("Rate updated.",1)}render()}
+function delS(id){if(S.bookings.some(function(k){return k.sid==id&&(k.status=="Confirmed"||k.status=="Checked-in")})){flash("Cannot delete: service has active bookings.",0)}else{S.services=S.services.filter(function(x){return x.id!=id});save();flash("Service deleted.",1)}render()}
+function step(id,st){var k=S.bookings.filter(function(x){return x.id==id})[0];if(k){k.status=st;save();flash(id+": "+st+". "+(st=="Checked-out"?"Slot is available again.":""),1)}render()}
+load();render();
+</script>
+</body>
+</html>
